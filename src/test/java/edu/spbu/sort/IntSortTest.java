@@ -8,9 +8,6 @@ import java.util.Random;
 
 import static org.junit.Assert.*;
 
-/**
- * Created by artemaliev on 07/09/15.
- */
 public class IntSortTest
 {
   public static final int SEED = 1;
@@ -33,7 +30,7 @@ public class IntSortTest
 
   @Test
   public void testSortArray() throws Exception {
-    int array[] = generateRandomIntArray(ARRAY_SIZE, SEED);
+    int[] array = generateRandomIntArray(ARRAY_SIZE, SEED);
 
     IntSort.sort(array);
 
