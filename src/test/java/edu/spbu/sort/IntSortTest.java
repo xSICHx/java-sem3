@@ -11,7 +11,7 @@ import static org.junit.Assert.*;
 public class IntSortTest
 {
   public static final int SEED = 1;
-  public static final int ARRAY_SIZE = 10000000;
+  public static final int ARRAY_SIZE = 100_000_000;
 
   /**
    *
@@ -31,8 +31,10 @@ public class IntSortTest
   @Test
   public void testSortArray() throws Exception {
     int[] array = generateRandomIntArray(ARRAY_SIZE, SEED);
-
+    long startTime = System.nanoTime();
     IntSort.sort(array);
+    long estimatedTime = System.nanoTime() - startTime;
+    System.out.println("Execution time(ms) " + (estimatedTime/ 1000000));
 
     // проверяем правильность сортировки
     int previousValue = Integer.MIN_VALUE;
