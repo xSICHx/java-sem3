@@ -1,10 +1,7 @@
 package edu.spbu.sort;
 
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.RecursiveAction;
 
 public class IntSort {
   public static int medianThree(int[] a, int l, int r){

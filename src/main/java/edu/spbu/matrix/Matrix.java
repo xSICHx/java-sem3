@@ -1,5 +1,7 @@
 package edu.spbu.matrix;
 
+import java.util.List;
+
 /**
  *
  */
@@ -11,6 +13,7 @@ public interface Matrix
    * @param o
    * @return
    */
+
   Matrix mul(Matrix o);
 
   /**

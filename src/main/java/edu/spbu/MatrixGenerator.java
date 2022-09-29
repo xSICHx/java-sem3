@@ -1,5 +1,8 @@
 package edu.spbu;
 
+import edu.spbu.matrix.DenseMatrix;
+import edu.spbu.matrix.Matrix;
+
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -29,10 +32,10 @@ public class MatrixGenerator
     this.size = size;
     this.file = file;
     rnd = new Random(seed);
-    emptyRow = Collections.nCopies(size, "0").stream().collect(Collectors.joining(" "));
+    emptyRow = String.join(" ", Collections.nCopies(size, "0"));
   }
 
-  public static void main(String args[])
+  public static void main(String[] args)
   {
     try
     {
@@ -46,10 +49,9 @@ public class MatrixGenerator
     }
   }
 
-  private static void testPerformance()
-  {
+  private static void testPerformance() throws IOException {
     // Uncomment the code to Test your library
-    /*
+
     System.out.println("Starting loading dense matrices");
     Matrix m1 = new DenseMatrix(MATRIX1_NAME);
     System.out.println("1 loaded");
@@ -59,15 +61,15 @@ public class MatrixGenerator
     m1.mul(m2);
     System.out.println("Dense Matrix time: " +(System.currentTimeMillis() - start));
 
-    System.out.println("Starting loading sparse matrices");
-    m1 = new SparseMatrix(MATRIX1_NAME);
-    System.out.println("1 loaded");
-    m2 = new SparseMatrix(MATRIX2_NAME);
-    System.out.println("2 loaded");
-    start = System.currentTimeMillis();
-    m1.mul(m2);
-    System.out.println("Sparse Matrix time: " +(System.currentTimeMillis() - start));
-    */
+//    System.out.println("Starting loading sparse matrices");
+//    m1 = new SparseMatrix(MATRIX1_NAME);
+//    System.out.println("1 loaded");
+//    m2 = new SparseMatrix(MATRIX2_NAME);
+//    System.out.println("2 loaded");
+//    start = System.currentTimeMillis();
+//    m1.mul(m2);
+//    System.out.println("Sparse Matrix time: " +(System.currentTimeMillis() - start));
+
   }
 
   public void generate() throws IOException
