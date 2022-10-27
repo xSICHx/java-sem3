@@ -58,7 +58,8 @@ public class MatrixGenerator
     Matrix m2 = new DenseMatrix(MATRIX2_NAME);
     System.out.println("2 loaded");
     long start = System.currentTimeMillis();
-    m1.mul(m2);
+    Matrix r1 = m1.mul(m2);
+    ((DenseMatrix)r1).print();
     System.out.println("Dense Matrix time: " +(System.currentTimeMillis() - start));
 
 //    System.out.println("Starting loading sparse matrices");

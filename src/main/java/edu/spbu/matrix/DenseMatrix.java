@@ -1,84 +1,171 @@
 package edu.spbu.matrix;
 
 import java.io.*;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.stream.Collectors;
+import edu.spbu.HelpfulMethods;
+
+import static java.lang.Math.abs;
 
 /**
  * Плотная матрица
  */
 public class DenseMatrix implements Matrix
 {
-  /**
-   * загружает матрицу из файла
-   * @param fileName
-   */
-//  как сделать адекватно private
-  private List<List<Integer>> matrixList = new ArrayList<>();
-  public DenseMatrix(String fileName) throws IOException {
-    BufferedReader buffReader = new BufferedReader(new FileReader(fileName));
-    String line = buffReader.readLine();
-    while (line != null){
-      this.matrixList.add(Arrays.stream((line.split(" "))).mapToInt(Integer::parseInt).boxed().collect(Collectors.toList()));
-      line = buffReader.readLine();
+  private double[][] matrixArr;
+  private final int[] matrixSize = {0, 0};
+  private int hash = 0;
+  public DenseMatrix(String fileName){
+    try (FileInputStream fIn = new FileInputStream(fileName)){
+      BufferedReader reader = new BufferedReader(new InputStreamReader(fIn));
+      String line;
+      //finding number of lines
+      while ((line = reader.readLine()) != null){
+        if (!line.isEmpty())
+          matrixSize[0]++;
+      }
+      if (matrixSize[0] == 0){
+        throw new IOException("empty file.");
+      }
+      //finding number of columns and reset file
+      fIn.getChannel().position(0);
+      reader = new BufferedReader(new InputStreamReader(fIn));
+
+      //avoiding a lot of white spaces and empty lines
+      do {
+        line = reader.readLine();
+      } while (line.isEmpty());
+      line = line.replaceAll("\\s+", " ");
+      line = line.replaceAll(",", ".");
+      List<Double> lst = Arrays.stream((line.split(" "))).mapToDouble(Double::parseDouble).boxed().collect(Collectors.toList());
+      matrixSize[1] = lst.size();
+      if (matrixSize[1] == 0){
+        throw new IOException("zero elements in line.");
+      }
+      matrixArr = new double[getLineCount()][getColumnCount()];
+
+      //reading matrix
+      HelpfulMethods.listToArr(lst, matrixArr[0]);
+      hash = 31 + Arrays.hashCode(matrixArr[0]);
+      for (int i = 1; i < getLineCount(); i++){
+        do {
+          line = reader.readLine();
+        } while (line.isEmpty());
+        line = line.replaceAll("\\s+", " ");
+        line = line.replaceAll(",", ".");
+        lst = Arrays.stream((line.split(" "))).mapToDouble(Double::parseDouble).boxed().collect(Collectors.toList());
+        if (lst.size() != getColumnCount()){
+          throw new IOException("different count of elements in lines.");
+        }
+        HelpfulMethods.listToArr(lst, matrixArr[i]);
+        hash = hash*31 + Arrays.hashCode(matrixArr[i]);
+      }
+    }
+    catch (Exception e){
+      hash = 0;
+      matrixArr = new double[0][0];
+      matrixSize[0] = 0;
+      matrixSize[1] = 0;
+      System.out.println("Wrong input format: " + e.getMessage() + " This matrix was created empty");
     }
   }
-  public DenseMatrix(List<List<Integer>> list){
-    this.matrixList = list;
+  public DenseMatrix(double[][] arr){
+    if (Arrays.deepEquals(arr, new double[][]{{}})){
+      matrixArr = arr.clone();
+      return;
+    }
+    if (Arrays.deepEquals(arr, new double[0][0])){
+      matrixArr = arr.clone();
+      return;
+    }
+    matrixSize[0] = arr.length;
+    matrixSize[1] = arr[0].length;
+    matrixArr = arr.clone();
+    hash = 1;
+    for (double[] doubles : arr) {
+      hash = hash * 31 + Arrays.hashCode(doubles);
+    }
   }
-  public List<List<Integer>> getMatrixList(){
-    return matrixList;
+
+  //emptyArray
+  DenseMatrix(int lineCount, int columnCount){
+    matrixSize[0] = lineCount;
+    matrixSize[1] = columnCount;
+    matrixArr = new double[lineCount][columnCount];
+  }
+
+  public double[][] getMatrixArr(){
+    return matrixArr;
+  }
+  public int getLineCount(){
+    return matrixSize[0];
+  }
+  public int getColumnCount(){
+    return  matrixSize[1];
   }
   public void print(){
-
-    for (List<Integer> ints : matrixList) {
-      System.out.print(Arrays.toString(new List[]{ints}));
-      System.out.println();
+    System.out.println(Arrays.toString(matrixSize));
+    for (int i = 0; i < getLineCount(); i++) {
+      System.out.println(Arrays.toString(matrixArr[i]));
     }
   }
-  /**
-   * однопоточное умнджение матриц
-   * должно поддерживаться для всех 4-х вариантов
-   *
-   * @param o
-   * @return
-   */
-  @Override public Matrix mul(Matrix o)
-  {
-    if (o instanceof DenseMatrix){
+  public void printAsArray(){
+    System.out.println(Arrays.deepToString(matrixArr).replaceAll("\\[", "{").replaceAll("]", "}"));
+  }
 
-
-      if (((DenseMatrix) o).getMatrixList().size() != this.matrixList.get(0).size())
-        return null;
-
-      List<List<Integer>> m1 = this.matrixList;
-      List<List<Integer>> m2 = ((DenseMatrix) o).getMatrixList();
-      List<List<Integer>> result = new ArrayList<>();
-
-      for (int i = 0; i < m1.size(); i++){
-        List<Integer> raw = new ArrayList<>();
-        for (int j = 0; j < m2.get(0).size(); j++){
-          int cell = 0;
-          for (int k = 0; k < m2.size(); k++){
-            cell += m1.get(i).get(k) * m2.get(k).get(j);
+  @Override
+  public Matrix mul(Matrix o) {
+    //TODO sparse matrix
+    if (o instanceof DenseMatrix) {
+      if (((DenseMatrix) o).getLineCount() == 0 || ((DenseMatrix) o).getColumnCount() == 0 ||
+          this.getColumnCount() == 0 || this.getLineCount() == 0)
+        return new DenseMatrix(0, 0);
+      if (((DenseMatrix) o).getLineCount() != this.getColumnCount())
+        return new DenseMatrix(0, 0);
+      double[][] m1 = matrixArr;
+      double[][] m2 = matrixTransposition(((DenseMatrix) o).matrixArr).matrixArr;
+      // m2.length because of transposition
+      DenseMatrix res = new DenseMatrix(m1.length, m2.length);
+      double[][] mRes = res.getMatrixArr();
+      int resHash = 1;
+      for (int i = 0; i < m1.length; i++) {//m
+        int tempHash = 1;
+        for (int j = 0; j < m2.length; j++) {//z
+          mRes[i][j] = 0;
+          for (int k = 0; k < m1[0].length; k++) { //n
+            mRes[i][j] += m1[i][k]*m2[j][k];
           }
-          raw.add(cell);
+          long bits = Double.doubleToLongBits(mRes[i][j]);
+          tempHash = tempHash*31 + (int)(bits ^ (bits >>> 32));
         }
-        result.add(raw);
+        resHash = resHash*31 + tempHash;
       }
-      return new DenseMatrix(result);
+      res.hash = resHash;
+      return res;
     }
-    return null;
+
+
+    if (o instanceof SparseMatrix){
+      SparseMatrix bTrans = ((SparseMatrix) o).matrixTransposition((SparseMatrix) o);
+      DenseMatrix aTrans = this.matrixTransposition(this.getMatrixArr());
+      return (aTrans).matrixTransposition(((DenseMatrix) bTrans.mul(aTrans)).getMatrixArr());
+    }
+
+    return new DenseMatrix(0, 0);
+  }
+  public DenseMatrix matrixTransposition(double[][] src){
+    double[][] res = new double[src[0].length][src.length];
+    for (int i = 0; i < src[0].length; i++) {
+      for (int j = 0; j < src.length; j++) {
+        res[i][j] = src[j][i];
+      }
+    }
+    return new DenseMatrix(res);
   }
 
   /**
    * многопоточное умножение матриц
    *
-   * @param o
-   * @return
    */
   @Override public Matrix dmul(Matrix o)
   {
@@ -87,30 +174,42 @@ public class DenseMatrix implements Matrix
 
   /**
    * спавнивает с обоими вариантами
-   * @param o
-   * @return
    */
   @Override public boolean equals(Object o) {
-    if (!(o instanceof DenseMatrix) || (o.hashCode() != this.hashCode()))
+    //TODO доделать для sparseMatrix
+
+//    if (!(o instanceof DenseMatrix) || (o.hashCode() != this.hashCode())){
+//    if (!(o instanceof DenseMatrix)){
+//      System.out.println(((DenseMatrix) o).hashCode());
+//      System.out.println(this.hash);
+//      return false;
+//    }
+    if ((o instanceof DenseMatrix)){
+    if (this.getColumnCount() != ((DenseMatrix) o).getColumnCount() || this.getLineCount() != ((DenseMatrix) o).getLineCount())
       return false;
-    List<List<Integer>> m1 = this.getMatrixList();
-    List<List<Integer>> m2 = ((DenseMatrix)o).getMatrixList();
-    for (int i = 0; i < this.matrixList.size(); i++){
-      for (int j = 0; j < this.matrixList.get(0).size(); j++){
-        if (!Objects.equals(m2.get(i).get(j), m1.get(i).get(j))) {
+    double[][] m1 = this.getMatrixArr();
+    double[][] m2 = ((DenseMatrix)o).getMatrixArr();
+    for (int i = 0; i < this.getLineCount(); i++){
+      for (int j = 0; j < this.getColumnCount(); j++){
+        if (abs(m2[i][j] - m1[i][j]) > 0.0001) {
           return false;
         }
       }
     }
     return true;
-  }
-  @Override public int hashCode(){
-    int hashCode = 1;
-    for (List<Integer> ints: this.matrixList) {
-      hashCode = 31*hashCode + (ints==null ? 0 : ints.hashCode());
     }
-    return hashCode;
+    else if ((o instanceof SparseMatrix)) {
+      return o.equals(this);
+    }
+    return false;
   }
 
+  @Override public int hashCode(){
+    return hash;
+  }
+
+  void setHash(int x){
+    hash = x;
+  }
 
 }

@@ -52,9 +52,6 @@ public class ParallelQuickSort {
             rightArr.join();
 
             leftArr.join();
-//            invokeAll(new SortAction(array, start, right));
-//
-//            invokeAll(new SortAction(array, left, end));
         }
     }
 }
