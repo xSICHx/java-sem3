@@ -5,10 +5,7 @@ import java.io.BufferedReader;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static java.lang.Math.abs;
@@ -21,6 +18,7 @@ public class SparseMatrix implements Matrix
 {
   private HashMap<Integer, HashMap<Integer, Double>> matrixHashMap;
   private final int[] matrixSize = {0, 0};
+  private static final int rounding = 10000;
   private int hash = 0;
   public SparseMatrix(String fileName) {
     try (FileInputStream fIn = new FileInputStream(fileName)){
@@ -52,15 +50,11 @@ public class SparseMatrix implements Matrix
       matrixHashMap = new HashMap<>();
 
       //reading first line matrix
-      int lineHash = 1;
       for (int i = 0; i < lst.size(); i++) {
         if (lst.get(i) != 0){
           this.put(0, i, lst.get(i));
         }
-        long bits = Double.doubleToLongBits(lst.get(i));
-        lineHash = 31 * lineHash + (int)(bits ^ (bits >>> 32));
       }
-      hash = 31 + lineHash;
       //reading last part of matrix
       for (int i = 1; i < getLineCount(); i++){
         do {
@@ -72,16 +66,13 @@ public class SparseMatrix implements Matrix
         if (lst.size() != getColumnCount()){
           throw new IOException("different count of elements in lines.");
         }
-        lineHash = 1;
         for (int j = 0; j < lst.size(); j++) {
           if (lst.get(j) != 0){
             this.put(i, j, lst.get(j));
           }
-          long bits = Double.doubleToLongBits(lst.get(j));
-          lineHash = 31 * lineHash + (int)(bits ^ (bits >>> 32));
         }
-        hash = hash*31 + lineHash;
       }
+      hash = calculateHashCode(this.matrixHashMap);
     }
     catch (Exception e){
       hash = 0;
@@ -102,6 +93,7 @@ public class SparseMatrix implements Matrix
         this.put(i, j, temp.get(j));
       }
     }
+    this.hash = calculateHashCode(map);
   }
   public SparseMatrix(double[][] arr){
     matrixHashMap = new HashMap<>();
@@ -113,17 +105,13 @@ public class SparseMatrix implements Matrix
     }
     matrixSize[0] = arr.length;
     matrixSize[1] = arr[0].length;
-    hash = 1;
     for (int i = 0; i < arr.length; i++) {
-      int lineHash = 1;
       for (int j = 0; j < arr[0].length; j++) {
         if (arr[i][j] != 0)
           this.put(i, j, arr[i][j]);
-        long bits = Double.doubleToLongBits(arr[i][j]);
-        lineHash = 31 * lineHash + (int)(bits ^ (bits >>> 32));
       }
-      hash = hash*31 + lineHash;
     }
+    hash = calculateHashCode(this.matrixHashMap);
   }
   public SparseMatrix(int m, int n){
     matrixHashMap = new HashMap<>();
@@ -160,31 +148,32 @@ public class SparseMatrix implements Matrix
       SparseMatrix m1 = this;
       SparseMatrix m2 = ((SparseMatrix) o).matrixTransposition(((SparseMatrix) o));
       SparseMatrix res = new SparseMatrix(this.getLineCount(), ((SparseMatrix) o).getColumnCount());
-      int resHash = 1;
-      for (int i = 0; i < m1.getLineCount(); i++) {//m
-        int tempHash = 1;
-        if (!(m1.getMatrixHashMap().containsKey(i))){
-          tempHash = (int) pow(31, m2.getLineCount());
-          resHash = resHash*31 + tempHash;
-          continue;
-        }
-        for (int j = 0; j < m2.getLineCount(); j++) {//z
-          if (!(m2.getMatrixHashMap().containsKey(j))){
-            long bits = Double.doubleToLongBits(res.getElement(i, j));
-            tempHash = tempHash*31 + (int)(bits ^ (bits >>> 32));
-            continue;
+//      for (int i = 0; i < m1.getLineCount(); i++) {//m
+//        if (!(m1.getMatrixHashMap().containsKey(i))){
+//          continue;
+//        }
+//        for (int j = 0; j < m2.getLineCount(); j++) {//z
+//          if (!(m2.getMatrixHashMap().containsKey(j))){
+//            continue;
+//          }
+//          for (int k = 0; k < m1.getColumnCount(); k++) { //n
+//            res.put(i, j, res.getElement(i, j)+m1.getElement(i, k)*m2.getElement(j, k));
+//          }
+//        }
+//      }
+      for (Map.Entry<Integer, HashMap<Integer, Double>> lineM1: m1.getMatrixHashMap().entrySet()) {//m
+        for (Map.Entry<Integer, HashMap<Integer, Double>> lineM2: m2.getMatrixHashMap().entrySet()) {//z
+          for (Map.Entry<Integer, Double> elemM1: lineM1.getValue().entrySet()) {//n
+            int i = lineM1.getKey(), j = lineM2.getKey(), k = elemM1.getKey();
+            if (lineM2.getValue().containsKey(k))
+              res.put(i, j, res.getElement(i, j)+elemM1.getValue()*lineM2.getValue().get(k));
           }
-          for (int k = 0; k < m1.getColumnCount(); k++) { //n
-            res.put(i, j, res.getElement(i, j)+m1.getElement(i, k)*m2.getElement(j, k));
-          }
-          long bits = Double.doubleToLongBits(res.getElement(i, j));
-          tempHash = tempHash*31 + (int)(bits ^ (bits >>> 32));
         }
-        resHash = resHash*31 + tempHash;
       }
-      res.hash = resHash;
+      res.hash = calculateHashCode(res.matrixHashMap);
       return res;
     }
+
 
     if (o instanceof DenseMatrix){
       if (((DenseMatrix) o).getLineCount() == 0 || ((DenseMatrix) o).getColumnCount() == 0 ||
@@ -196,29 +185,33 @@ public class SparseMatrix implements Matrix
       SparseMatrix m1 = this;
       DenseMatrix m2 = ((DenseMatrix) o).matrixTransposition(((DenseMatrix) o).getMatrixArr());
       double[][] m2Arr = m2.getMatrixArr();
-      DenseMatrix res = new DenseMatrix(this.getLineCount(), ((DenseMatrix) o).getColumnCount());
-      double[][] resArr = res.getMatrixArr();
-      int resHash = 1;
-      for (int i = 0; i < m1.getLineCount(); i++) {//m
-        int tempHash = 1;
-        if (!(m1.getMatrixHashMap().containsKey(i))){
-          for (int j = 0; j < m2.getLineCount(); j++){
-            resArr[i][j] = 0;
-            tempHash = tempHash*31;
+//      DenseMatrix res = new DenseMatrix(this.getLineCount(), ((DenseMatrix) o).getColumnCount());
+//      double[][] resArr = res.getMatrixArr();
+//      for (int i = 0; i < m1.getLineCount(); i++) {//m
+//        if (!(m1.getMatrixHashMap().containsKey(i))){
+//          for (int j = 0; j < m2.getLineCount(); j++){
+//            resArr[i][j] = 0;
+//          }
+//          continue;
+//        }
+//        for (int j = 0; j < m2.getLineCount(); j++) {//z
+//          for (int k = 0; k < m1.getColumnCount(); k++) { //n
+//            resArr[i][j] += m1.getElement(i, k)*m2Arr[j][k];
+//          }
+//        }
+//      }
+      SparseMatrix res = new SparseMatrix(this.getLineCount(), ((DenseMatrix) o).getColumnCount());
+      HashMap<Integer, HashMap<Integer, Double>> resHashMap = res.matrixHashMap;
+
+      for (Map.Entry<Integer, HashMap<Integer, Double>> lineM1: m1.getMatrixHashMap().entrySet()) {//m
+        for (int j = 0; j < m2.getLineCount(); j++) {
+          for (Map.Entry<Integer, Double> elemM1: lineM1.getValue().entrySet()) {
+            int i = lineM1.getKey(), k = elemM1.getKey();
+            res.put(i, j, res.getElement(i, j)+elemM1.getValue()*m2Arr[j][k]);
           }
-          resHash = resHash*31 + tempHash;
-          continue;
         }
-        for (int j = 0; j < m2.getLineCount(); j++) {//z
-          for (int k = 0; k < m1.getColumnCount(); k++) { //n
-            resArr[i][j] += m1.getElement(i, k)*m2Arr[j][k];
-          }
-          long bits = Double.doubleToLongBits(resArr[i][j]);
-          tempHash = tempHash*31 + (int)(bits ^ (bits >>> 32));
-        }
-        resHash = resHash*31 + tempHash;
       }
-      res.setHash(resHash);
+      res.hash = res.calculateHashCode(resHashMap);
       return res;
     }
     return new SparseMatrix(new HashMap<>());
@@ -316,4 +309,18 @@ public class SparseMatrix implements Matrix
       System.out.println();
     }
   }
+  
+  private int calculateHashCode(HashMap<Integer, HashMap<Integer, Double>> map){
+    if (map.isEmpty()){
+      return 0;
+    }
+    int result = 1;
+    for (HashMap<Integer, Double> raw: map.values()) {
+      for (Double elem: raw.values()) {
+        result *= (int) Math.floor(elem * rounding);
+      }
+    }
+    return result;
+  }
+  
 }

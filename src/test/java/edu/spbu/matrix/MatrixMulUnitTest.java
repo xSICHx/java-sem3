@@ -10,7 +10,7 @@ import org.junit.jupiter.api.RepeatedTest;
 
 public class MatrixMulUnitTest {
 
-    @RepeatedTest(10)
+    @RepeatedTest(1000)
     public void repeatedDenseMulTest(){
         double[][] matrixData = MatrixGenerator.generateArray(1000);
         RealMatrix m = MatrixUtils.createRealMatrix(matrixData);
@@ -19,7 +19,7 @@ public class MatrixMulUnitTest {
         double[][] expected = m.multiply(n).getData();
         DenseMatrix m1 = new DenseMatrix(matrixData);
         DenseMatrix m2 = new DenseMatrix(matrixData2);
-        DenseMatrix actual = ((DenseMatrix) m1.mul(m2));
+        DenseMatrix actual = ((DenseMatrix) m1.dmul(m2));
         Assertions.assertEquals(new DenseMatrix(expected), actual);
     }
 
@@ -64,7 +64,7 @@ public class MatrixMulUnitTest {
         DenseMatrix m2 = new DenseMatrix(matrixData2);
         DenseMatrix expected = ((DenseMatrix) m1.mul(m2));
         SparseMatrix sparseMatrix1 = new SparseMatrix(matrixData);
-        DenseMatrix actual = ((DenseMatrix) sparseMatrix1.mul(m2));
+        SparseMatrix actual = ((SparseMatrix) sparseMatrix1.mul(m2));
         Assertions.assertEquals(expected, actual);
     }
 
@@ -76,7 +76,7 @@ public class MatrixMulUnitTest {
         DenseMatrix m2 = new DenseMatrix(matrixData2);
         DenseMatrix expected = ((DenseMatrix) m1.mul(m2));
         SparseMatrix sparseMatrix2 = new SparseMatrix(matrixData2);
-        DenseMatrix actual = ((DenseMatrix) m1.mul(sparseMatrix2));
+        SparseMatrix actual = ((SparseMatrix) m1.mul(sparseMatrix2));
         Assertions.assertEquals(expected, actual);
     }
 

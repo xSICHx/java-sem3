@@ -14,6 +14,7 @@ public class DenseMatrix implements Matrix
 {
   private double[][] matrixArr;
   private final int[] matrixSize = {0, 0};
+  private static final int rounding = 10000;
   private int hash = 0;
   public DenseMatrix(String fileName){
     try (FileInputStream fIn = new FileInputStream(fileName)){
@@ -46,7 +47,6 @@ public class DenseMatrix implements Matrix
 
       //reading matrix
       HelpfulMethods.listToArr(lst, matrixArr[0]);
-      hash = 31 + Arrays.hashCode(matrixArr[0]);
       for (int i = 1; i < getLineCount(); i++){
         do {
           line = reader.readLine();
@@ -58,8 +58,8 @@ public class DenseMatrix implements Matrix
           throw new IOException("different count of elements in lines.");
         }
         HelpfulMethods.listToArr(lst, matrixArr[i]);
-        hash = hash*31 + Arrays.hashCode(matrixArr[i]);
       }
+      hash = calculateHashCode(matrixArr);
     }
     catch (Exception e){
       hash = 0;
@@ -81,10 +81,7 @@ public class DenseMatrix implements Matrix
     matrixSize[0] = arr.length;
     matrixSize[1] = arr[0].length;
     matrixArr = arr.clone();
-    hash = 1;
-    for (double[] doubles : arr) {
-      hash = hash * 31 + Arrays.hashCode(doubles);
-    }
+    hash = calculateHashCode(arr);
   }
 
   //emptyArray
@@ -127,20 +124,15 @@ public class DenseMatrix implements Matrix
       // m2.length because of transposition
       DenseMatrix res = new DenseMatrix(m1.length, m2.length);
       double[][] mRes = res.getMatrixArr();
-      int resHash = 1;
       for (int i = 0; i < m1.length; i++) {//m
-        int tempHash = 1;
         for (int j = 0; j < m2.length; j++) {//z
           mRes[i][j] = 0;
-          for (int k = 0; k < m1[0].length; k++) { //n
+          for (int k = 0; k < m1[0].length; k++) {//n
             mRes[i][j] += m1[i][k]*m2[j][k];
           }
-          long bits = Double.doubleToLongBits(mRes[i][j]);
-          tempHash = tempHash*31 + (int)(bits ^ (bits >>> 32));
         }
-        resHash = resHash*31 + tempHash;
       }
-      res.hash = resHash;
+      res.hash = calculateHashCode(mRes);
       return res;
     }
 
@@ -148,7 +140,7 @@ public class DenseMatrix implements Matrix
     if (o instanceof SparseMatrix){
       SparseMatrix bTrans = ((SparseMatrix) o).matrixTransposition((SparseMatrix) o);
       DenseMatrix aTrans = this.matrixTransposition(this.getMatrixArr());
-      return (aTrans).matrixTransposition(((DenseMatrix) bTrans.mul(aTrans)).getMatrixArr());
+      return (bTrans).matrixTransposition(((SparseMatrix) bTrans.mul(aTrans)));
     }
 
     return new DenseMatrix(0, 0);
@@ -167,31 +159,90 @@ public class DenseMatrix implements Matrix
    * многопоточное умножение матриц
    *
    */
+  private void calcElemDenseToDense(int i, int j, double[][] M1, double[][] M2, double[][] result){
+
+    result[i][j] = 0;
+    for (int k = 0; k < M1[0].length; k++) {//n
+      result[i][j] += M1[i][k]*M2[j][k];
+    }
+  }
+  public static class ThreadCalcElem extends Thread{
+    private final double[][] M1;
+    private final double[][] M2;
+    private final double[][] result;
+    private final int i;
+    ThreadCalcElem(int i, double[][] M1, double[][] M2, double[][] result){
+      this.M1 = M1;
+      this.M2 = M2;
+      this.result = result;
+      this.i = i;
+    }
+    @Override public void run(){
+      for (int j = 0; j < M2.length; j++) {//z
+        result[i][j] = 0;
+        for (int k = 0; k < M1[0].length; k++) {//n
+          result[i][j] += M1[i][k] * M2[j][k];
+        }
+      }
+    }
+  }
+
   @Override public Matrix dmul(Matrix o)
   {
-   return null;
+    if (o instanceof DenseMatrix) {
+      if (((DenseMatrix) o).getLineCount() == 0 || ((DenseMatrix) o).getColumnCount() == 0 ||
+              this.getColumnCount() == 0 || this.getLineCount() == 0)
+        return new DenseMatrix(0, 0);
+      if (((DenseMatrix) o).getLineCount() != this.getColumnCount())
+        return new DenseMatrix(0, 0);
+
+      // m2.length because of transposition
+      double[][] M1 = this.getMatrixArr();
+      double[][] M2 = matrixTransposition(((DenseMatrix) o).matrixArr).matrixArr;
+      DenseMatrix res = new DenseMatrix(M1.length, M2.length);
+      double[][] mRes = res.getMatrixArr();
+      ThreadCalcElem[] calcElemThreads = new ThreadCalcElem[res.getLineCount()];
+      for (int i = 0; i < M1.length; i++) {//m
+        calcElemThreads[i] = new ThreadCalcElem(i, M1, M2, mRes);
+        calcElemThreads[i].start();
+
+      }
+      try{
+        for (ThreadCalcElem thread: calcElemThreads) {
+          thread.join();
+        }
+      }
+      catch (Exception e){
+        e.printStackTrace();
+      }
+      res.setHash(calculateHashCode(res.getMatrixArr()));
+      return res;
+    }
+
+
+    if (o instanceof SparseMatrix){
+      SparseMatrix bTrans = ((SparseMatrix) o).matrixTransposition((SparseMatrix) o);
+      DenseMatrix aTrans = this.matrixTransposition(this.getMatrixArr());
+      return (bTrans).matrixTransposition(((SparseMatrix) bTrans.mul(aTrans)));
+    }
+
+    return new DenseMatrix(0, 0);
   }
 
   /**
    * спавнивает с обоими вариантами
    */
   @Override public boolean equals(Object o) {
-    //TODO доделать для sparseMatrix
-
-//    if (!(o instanceof DenseMatrix) || (o.hashCode() != this.hashCode())){
-//    if (!(o instanceof DenseMatrix)){
-//      System.out.println(((DenseMatrix) o).hashCode());
-//      System.out.println(this.hash);
-//      return false;
-//    }
     if ((o instanceof DenseMatrix)){
     if (this.getColumnCount() != ((DenseMatrix) o).getColumnCount() || this.getLineCount() != ((DenseMatrix) o).getLineCount())
+      return false;
+    if(this.hash != ((DenseMatrix) o).hash)
       return false;
     double[][] m1 = this.getMatrixArr();
     double[][] m2 = ((DenseMatrix)o).getMatrixArr();
     for (int i = 0; i < this.getLineCount(); i++){
       for (int j = 0; j < this.getColumnCount(); j++){
-        if (abs(m2[i][j] - m1[i][j]) > 0.0001) {
+        if (abs(m2[i][j] - m1[i][j]) > 1.0/(double) rounding) {
           return false;
         }
       }
@@ -206,6 +257,22 @@ public class DenseMatrix implements Matrix
 
   @Override public int hashCode(){
     return hash;
+  }
+  public int calculateHashCode(double[][] arr){
+    int resultHash = 0;
+    int flagNotaZero = 0;
+    for (double[] doubles : arr) {
+      for (int j = 0; j < arr[0].length; j++) {
+        if (doubles[j] != 0) {
+          if (flagNotaZero == 0) {
+            resultHash = 1;
+            flagNotaZero = 1;
+          }
+          resultHash *=(int) Math.floor(doubles[j] * rounding);
+        }
+      }
+    }
+    return resultHash;
   }
 
   void setHash(int x){
