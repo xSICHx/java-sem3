@@ -10,7 +10,7 @@ public class MatrixGenerator {
     static double[][] generateArray(int bound){
 //        int m = ThreadLocalRandom.current().nextInt(1, bound);
 //        int n = ThreadLocalRandom.current().nextInt(1, bound);
-        int m = 1000, n = 1000;
+        int m = bound, n = bound;
 
 
         double[][] arr = new double[m][n];
@@ -22,10 +22,10 @@ public class MatrixGenerator {
         return arr;
     }
     static double[][] generateArray(int lineNumber, int bound){
-        int z = ThreadLocalRandom.current().nextInt(1, bound);
+//        int z = ThreadLocalRandom.current().nextInt(1, bound);
 
 //        double[][] arr = new double[lineNumber][z];
-        double[][] arr = new double[1000][1000];
+        double[][] arr = new double[bound][bound];
         for (int i = 0; i < arr.length; i++) {
             for (int j = 0; j < arr[0].length; j++) {
                 arr[i][j] = ThreadLocalRandom.current().nextDouble(-10000, 10000);

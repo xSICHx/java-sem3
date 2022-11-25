@@ -140,7 +140,7 @@ public class DenseMatrix implements Matrix
     if (o instanceof SparseMatrix){
       SparseMatrix bTrans = ((SparseMatrix) o).matrixTransposition((SparseMatrix) o);
       DenseMatrix aTrans = this.matrixTransposition(this.getMatrixArr());
-      return (bTrans).matrixTransposition(((SparseMatrix) bTrans.mul(aTrans)));
+      return (aTrans).matrixTransposition(((DenseMatrix) bTrans.mul(aTrans)).getMatrixArr());
     }
 
     return new DenseMatrix(0, 0);
@@ -170,18 +170,35 @@ public class DenseMatrix implements Matrix
     private final double[][] M1;
     private final double[][] M2;
     private final double[][] result;
-    private final int i;
-    ThreadCalcElem(int i, double[][] M1, double[][] M2, double[][] result){
+    private final int chunk;
+    private final int numberOfElementsInThread;
+    ThreadCalcElem(int i, int numberOfElementsInThread, double[][] M1, double[][] M2, double[][] result){
       this.M1 = M1;
       this.M2 = M2;
       this.result = result;
-      this.i = i;
+      this.chunk = i;
+      this.numberOfElementsInThread = numberOfElementsInThread;
     }
     @Override public void run(){
-      for (int j = 0; j < M2.length; j++) {//z
-        result[i][j] = 0;
+//      for (int j = 0; j < M2.length; j++) {//z
+//        result[chunk][j] = 0;
+//        for (int k = 0; k < M1[0].length; k++) {//n
+//          result[chunk][j] += M1[chunk][k] * M2[j][k];
+//        }
+//      }
+
+
+      int lowerBound = chunk*numberOfElementsInThread;
+      int upperBound = Math.min((chunk + 1) * numberOfElementsInThread, result.length * result[0].length);
+      int i = lowerBound/result[0].length, j = lowerBound % result[0].length;
+      for (int l = lowerBound; l < upperBound; l++) {
         for (int k = 0; k < M1[0].length; k++) {//n
           result[i][j] += M1[i][k] * M2[j][k];
+        }
+        j++;
+        if (j == result[0].length){
+          i++;
+          j = 0;
         }
       }
     }
@@ -195,22 +212,32 @@ public class DenseMatrix implements Matrix
         return new DenseMatrix(0, 0);
       if (((DenseMatrix) o).getLineCount() != this.getColumnCount())
         return new DenseMatrix(0, 0);
-
-      // m2.length because of transposition
       double[][] M1 = this.getMatrixArr();
+      // m2.length because of transposition
       double[][] M2 = matrixTransposition(((DenseMatrix) o).matrixArr).matrixArr;
       DenseMatrix res = new DenseMatrix(M1.length, M2.length);
       double[][] mRes = res.getMatrixArr();
-      ThreadCalcElem[] calcElemThreads = new ThreadCalcElem[res.getLineCount()];
-      for (int i = 0; i < M1.length; i++) {//m
-        calcElemThreads[i] = new ThreadCalcElem(i, M1, M2, mRes);
-        calcElemThreads[i].start();
+      int numberOfThreads = Runtime.getRuntime().availableProcessors();
+      int numberOfElementsInThread = res.getLineCount()*res.getColumnCount()/numberOfThreads;
+      numberOfThreads++;
 
+//      ThreadCalcElem calcThread = new ThreadCalcElem(0, numberOfElementsInThread, M1, M2, mRes);
+      ThreadCalcElem[] calcElemThreads = new ThreadCalcElem[numberOfThreads];
+      for (int i = 0; i < numberOfThreads; i++) {
+        calcElemThreads[i] = new ThreadCalcElem(i, numberOfElementsInThread, M1, M2, mRes);
+        calcElemThreads[i].start();
       }
+
+//      ThreadCalcElem[] calcElemThreads = new ThreadCalcElem[M1.length];
+//      for (int i = 0; i < M1.length; i++) {//m
+//        calcElemThreads[i] = new ThreadCalcElem(i,numberOfElementsInThread, M1, M2, mRes);
+//        calcElemThreads[i].start();
+//
+//      }
       try{
-        for (ThreadCalcElem thread: calcElemThreads) {
+        for (ThreadCalcElem thread: calcElemThreads)
           thread.join();
-        }
+//        calcThread.join();
       }
       catch (Exception e){
         e.printStackTrace();
@@ -223,7 +250,7 @@ public class DenseMatrix implements Matrix
     if (o instanceof SparseMatrix){
       SparseMatrix bTrans = ((SparseMatrix) o).matrixTransposition((SparseMatrix) o);
       DenseMatrix aTrans = this.matrixTransposition(this.getMatrixArr());
-      return (bTrans).matrixTransposition(((SparseMatrix) bTrans.mul(aTrans)));
+      return (aTrans).matrixTransposition(((DenseMatrix) bTrans.dmul(aTrans)).getMatrixArr());
     }
 
     return new DenseMatrix(0, 0);

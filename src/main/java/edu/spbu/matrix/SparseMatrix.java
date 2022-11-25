@@ -6,17 +6,17 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 import static java.lang.Math.abs;
-import static java.lang.Math.pow;
 
 /**
  * Разряженная матрица
  */
 public class SparseMatrix implements Matrix
 {
-  private HashMap<Integer, HashMap<Integer, Double>> matrixHashMap;
+  private Map<Integer, Map<Integer, Double>> matrixHashMap;
   private final int[] matrixSize = {0, 0};
   private static final int rounding = 10000;
   private int hash = 0;
@@ -82,13 +82,13 @@ public class SparseMatrix implements Matrix
       System.out.println("Wrong input format: " + e.getMessage() + " This matrix was created empty");
     }
   }
-  public SparseMatrix(HashMap<Integer, HashMap<Integer, Double>> map){
+  public SparseMatrix(Map<Integer, Map<Integer, Double>> map){
     matrixHashMap = new HashMap<>();
     if (map.isEmpty())
       return;
 
     for (Integer i: map.keySet()) {
-      HashMap<Integer, Double> temp = map.get(i);
+      Map<Integer, Double> temp = map.get(i);
       for (Integer j: temp.keySet()) {
         this.put(i, j, temp.get(j));
       }
@@ -113,8 +113,11 @@ public class SparseMatrix implements Matrix
     }
     hash = calculateHashCode(this.matrixHashMap);
   }
-  public SparseMatrix(int m, int n){
-    matrixHashMap = new HashMap<>();
+  public SparseMatrix(int m, int n, int flagDmul){
+    if (flagDmul == 0)
+      matrixHashMap = new HashMap<>();
+    else
+      matrixHashMap = new ConcurrentHashMap<>();
     if (m <= 0 || n <= 0)
       return;
     matrixSize[0] = m;
@@ -127,7 +130,7 @@ public class SparseMatrix implements Matrix
   public int getColumnCount(){
     return  matrixSize[1];
   }
-  public HashMap<Integer, HashMap<Integer, Double>> getMatrixHashMap(){
+  public Map<Integer, Map<Integer, Double>> getMatrixHashMap(){
     return matrixHashMap;
   }
   /**
@@ -147,7 +150,8 @@ public class SparseMatrix implements Matrix
 
       SparseMatrix m1 = this;
       SparseMatrix m2 = ((SparseMatrix) o).matrixTransposition(((SparseMatrix) o));
-      SparseMatrix res = new SparseMatrix(this.getLineCount(), ((SparseMatrix) o).getColumnCount());
+      SparseMatrix res = new SparseMatrix(this.getLineCount(), ((SparseMatrix) o).getColumnCount(), 0);
+
 //      for (int i = 0; i < m1.getLineCount(); i++) {//m
 //        if (!(m1.getMatrixHashMap().containsKey(i))){
 //          continue;
@@ -161,8 +165,9 @@ public class SparseMatrix implements Matrix
 //          }
 //        }
 //      }
-      for (Map.Entry<Integer, HashMap<Integer, Double>> lineM1: m1.getMatrixHashMap().entrySet()) {//m
-        for (Map.Entry<Integer, HashMap<Integer, Double>> lineM2: m2.getMatrixHashMap().entrySet()) {//z
+
+      for (Map.Entry<Integer, Map<Integer, Double>> lineM1: m1.getMatrixHashMap().entrySet()) {//m
+        for (Map.Entry<Integer, Map<Integer, Double>> lineM2: m2.getMatrixHashMap().entrySet()) {//z
           for (Map.Entry<Integer, Double> elemM1: lineM1.getValue().entrySet()) {//n
             int i = lineM1.getKey(), j = lineM2.getKey(), k = elemM1.getKey();
             if (lineM2.getValue().containsKey(k))
@@ -185,33 +190,18 @@ public class SparseMatrix implements Matrix
       SparseMatrix m1 = this;
       DenseMatrix m2 = ((DenseMatrix) o).matrixTransposition(((DenseMatrix) o).getMatrixArr());
       double[][] m2Arr = m2.getMatrixArr();
-//      DenseMatrix res = new DenseMatrix(this.getLineCount(), ((DenseMatrix) o).getColumnCount());
-//      double[][] resArr = res.getMatrixArr();
-//      for (int i = 0; i < m1.getLineCount(); i++) {//m
-//        if (!(m1.getMatrixHashMap().containsKey(i))){
-//          for (int j = 0; j < m2.getLineCount(); j++){
-//            resArr[i][j] = 0;
-//          }
-//          continue;
-//        }
-//        for (int j = 0; j < m2.getLineCount(); j++) {//z
-//          for (int k = 0; k < m1.getColumnCount(); k++) { //n
-//            resArr[i][j] += m1.getElement(i, k)*m2Arr[j][k];
-//          }
-//        }
-//      }
-      SparseMatrix res = new SparseMatrix(this.getLineCount(), ((DenseMatrix) o).getColumnCount());
-      HashMap<Integer, HashMap<Integer, Double>> resHashMap = res.matrixHashMap;
+      DenseMatrix res = new DenseMatrix(this.getLineCount(), ((DenseMatrix) o).getColumnCount());
+      double[][] resArr = res.getMatrixArr();
 
-      for (Map.Entry<Integer, HashMap<Integer, Double>> lineM1: m1.getMatrixHashMap().entrySet()) {//m
+      for (Map.Entry<Integer, Map<Integer, Double>> lineM1: m1.getMatrixHashMap().entrySet()) {//m
         for (int j = 0; j < m2.getLineCount(); j++) {
           for (Map.Entry<Integer, Double> elemM1: lineM1.getValue().entrySet()) {
             int i = lineM1.getKey(), k = elemM1.getKey();
-            res.put(i, j, res.getElement(i, j)+elemM1.getValue()*m2Arr[j][k]);
+            resArr[i][j] += elemM1.getValue()*m2Arr[j][k];
           }
         }
       }
-      res.hash = res.calculateHashCode(resHashMap);
+      res.setHash(res.calculateHashCode(resArr));
       return res;
     }
     return new SparseMatrix(new HashMap<>());
@@ -222,9 +212,107 @@ public class SparseMatrix implements Matrix
    * многопоточное умножение матриц
    *
    */
-  @Override public Matrix dmul(Matrix o)
-  {
-    return null;
+
+  public static class ThreadCalcChunkSparse extends Thread{
+    private final Map.Entry<Integer, Map<Integer, Double>> lineM1;
+    private final Map<Integer, Map<Integer, Double>> M2;
+    private final SparseMatrix result;
+    ThreadCalcChunkSparse(Map.Entry<Integer, Map<Integer, Double>> lineM1, Map<Integer, Map<Integer, Double>> M2, SparseMatrix result){
+      this.lineM1 = lineM1;
+      this.M2 = M2;
+      this.result = result;
+
+    }
+    @Override public void run(){
+      for (Map.Entry<Integer, Map<Integer, Double>> lineM2: M2.entrySet()) {//z
+        for (Map.Entry<Integer, Double> elemM1: lineM1.getValue().entrySet()) {//n
+          int i = lineM1.getKey(), j = lineM2.getKey(), k = elemM1.getKey();
+          if (lineM2.getValue().containsKey(k))
+            result.put(i, j, result.getElement(i, j)+elemM1.getValue()*lineM2.getValue().get(k));
+        }
+      }
+    }
+  }
+
+  public static class ThreadCalcChunkDense extends Thread{
+    private final Map.Entry<Integer, Map<Integer, Double>> lineM1;
+    private final double[][] M2;
+    private final double[][] result;
+    ThreadCalcChunkDense(Map.Entry<Integer, Map<Integer, Double>> lineM1, double[][] M2, double[][] result){
+      this.lineM1 = lineM1;
+      this.M2 = M2;
+      this.result = result;
+
+    }
+    @Override public void run(){
+      for (int j = 0; j < M2.length; j++) {
+        for (Map.Entry<Integer, Double> elemM1: lineM1.getValue().entrySet()) {
+          int i = lineM1.getKey(), k = elemM1.getKey();
+          result[i][j] += elemM1.getValue()*M2[j][k];
+        }
+      }
+    }
+  }
+
+
+  @Override public Matrix dmul(Matrix o){
+    if (o instanceof SparseMatrix) {
+      if (((SparseMatrix) o).getLineCount() == 0 || ((SparseMatrix) o).getColumnCount() == 0 ||
+              this.getColumnCount() == 0 || this.getLineCount() == 0)
+        return new SparseMatrix(new HashMap<>());
+      if (((SparseMatrix) o).getLineCount() != this.getColumnCount())
+        return new SparseMatrix(new HashMap<>());
+
+      SparseMatrix m1 = this;
+      SparseMatrix m2 = ((SparseMatrix) o).matrixTransposition(((SparseMatrix) o));
+      SparseMatrix res = new SparseMatrix(this.getLineCount(), ((SparseMatrix) o).getColumnCount(), 1);
+      List<ThreadCalcChunkSparse> calcElemThreads = new ArrayList<>();
+      for (Map.Entry<Integer, Map<Integer, Double>> lineM1: m1.getMatrixHashMap().entrySet()) {//m
+        calcElemThreads.add(new ThreadCalcChunkSparse(lineM1, m2.getMatrixHashMap(), res));
+        calcElemThreads.get(calcElemThreads.size()-1).start();
+      }
+      try{
+        for (ThreadCalcChunkSparse thread: calcElemThreads) {
+          thread.join();
+        }
+      }
+      catch (Exception e){
+        e.printStackTrace();
+      }
+      res.hash = calculateHashCode(res.matrixHashMap);
+      return res;
+    }
+
+
+    if (o instanceof DenseMatrix){
+      if (((DenseMatrix) o).getLineCount() == 0 || ((DenseMatrix) o).getColumnCount() == 0 ||
+              this.getColumnCount() == 0 || this.getLineCount() == 0)
+        return new SparseMatrix(new HashMap<>());
+      if (((DenseMatrix) o).getLineCount() != this.getColumnCount())
+        return new SparseMatrix(new HashMap<>());
+
+      SparseMatrix m1 = this;
+      DenseMatrix m2 = ((DenseMatrix) o).matrixTransposition(((DenseMatrix) o).getMatrixArr());
+      DenseMatrix res = new DenseMatrix(this.getLineCount(), ((DenseMatrix) o).getColumnCount());
+      double[][] resArr = res.getMatrixArr();
+
+      List<ThreadCalcChunkDense> calcElemThreads = new ArrayList<>();
+      for (Map.Entry<Integer, Map<Integer, Double>> lineM1: m1.getMatrixHashMap().entrySet()) {//m
+        calcElemThreads.add(new ThreadCalcChunkDense(lineM1, m2.getMatrixArr(), resArr));
+        calcElemThreads.get(calcElemThreads.size()-1).start();
+      }
+      try{
+        for (ThreadCalcChunkDense thread: calcElemThreads) {
+          thread.join();
+        }
+      }
+      catch (Exception e){
+        e.printStackTrace();
+      }
+      res.setHash(res.calculateHashCode(resArr));
+      return res;
+    }
+    return new SparseMatrix(new HashMap<>());
   }
 
   /**
@@ -273,25 +361,27 @@ public class SparseMatrix implements Matrix
   private void put(int i, int j, double value){
     if (value == 0)
       return;
-    if (matrixHashMap.containsKey(i))
-      matrixHashMap.get(i).put(j, value);
+    Map<Integer, Double> tmp = matrixHashMap.get(i);
+    if (tmp != null)
+      tmp.put(j, value);
     else{
       HashMap<Integer, Double> temp = new HashMap<>();
       temp.put(j, value);
       matrixHashMap.put(i, temp);
     }
   }
-  public double getElement(int i, int j){
+  public Double getElement(int i, int j){
     if (matrixHashMap.containsKey(i)){
-      HashMap<Integer, Double> raw = matrixHashMap.get(i);
+      Map<Integer, Double> raw = matrixHashMap.get(i);
       if (!raw.containsKey(j))
-        return 0;
+        return 0.0;
       return raw.get(j);
     }
-    return 0;
+    return 0.0;
   }
+
   public SparseMatrix matrixTransposition(SparseMatrix src){
-    SparseMatrix res = new SparseMatrix(src.getColumnCount(), src.getLineCount());
+    SparseMatrix res = new SparseMatrix(src.getColumnCount(), src.getLineCount(), 0);
     for (int i = 0; i < src.getColumnCount(); i++) {
       for (int j = 0; j < src.getLineCount(); j++) {
         res.put(i, j, src.getElement(j,i));
@@ -310,12 +400,12 @@ public class SparseMatrix implements Matrix
     }
   }
   
-  private int calculateHashCode(HashMap<Integer, HashMap<Integer, Double>> map){
+  private int calculateHashCode(Map<Integer, Map<Integer, Double>> map){
     if (map.isEmpty()){
       return 0;
     }
     int result = 1;
-    for (HashMap<Integer, Double> raw: map.values()) {
+    for (Map<Integer, Double> raw: map.values()) {
       for (Double elem: raw.values()) {
         result *= (int) Math.floor(elem * rounding);
       }

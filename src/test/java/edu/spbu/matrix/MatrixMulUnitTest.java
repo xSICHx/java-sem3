@@ -10,16 +10,18 @@ import org.junit.jupiter.api.RepeatedTest;
 
 public class MatrixMulUnitTest {
 
-    @RepeatedTest(1000)
+    @RepeatedTest(25)
     public void repeatedDenseMulTest(){
-        double[][] matrixData = MatrixGenerator.generateArray(1000);
+        double[][] matrixData = MatrixGenerator.generateArray(2000);
         RealMatrix m = MatrixUtils.createRealMatrix(matrixData);
-        double[][] matrixData2 = MatrixGenerator.generateArray(matrixData[0].length, 1000);
+        double[][] matrixData2 = MatrixGenerator.generateArray(matrixData[0].length, 2000);
         RealMatrix n = new Array2DRowRealMatrix(matrixData2);
         double[][] expected = m.multiply(n).getData();
         DenseMatrix m1 = new DenseMatrix(matrixData);
         DenseMatrix m2 = new DenseMatrix(matrixData2);
+        long start = System.currentTimeMillis();
         DenseMatrix actual = ((DenseMatrix) m1.dmul(m2));
+        System.out.println("time: " +(System.currentTimeMillis() - start));
         Assertions.assertEquals(new DenseMatrix(expected), actual);
     }
 
@@ -58,38 +60,42 @@ public class MatrixMulUnitTest {
 
     @RepeatedTest(5)
     public void repeatedSparseMulOnDenseTest(){
-        double[][] matrixData = MatrixGenerator.generateArray(1000);
-        double[][] matrixData2 = MatrixGenerator.generateArray(matrixData[0].length, 500);
+        double[][] matrixData = MatrixGenerator.generateArray(2000);
+        double[][] matrixData2 = MatrixGenerator.generateArray(matrixData[0].length, 2000);
         DenseMatrix m1 = new DenseMatrix(matrixData);
         DenseMatrix m2 = new DenseMatrix(matrixData2);
-        DenseMatrix expected = ((DenseMatrix) m1.mul(m2));
+        DenseMatrix expected = ((DenseMatrix) m1.dmul(m2));
         SparseMatrix sparseMatrix1 = new SparseMatrix(matrixData);
-        SparseMatrix actual = ((SparseMatrix) sparseMatrix1.mul(m2));
+        Matrix actual =  sparseMatrix1.dmul(m2);
         Assertions.assertEquals(expected, actual);
     }
 
     @RepeatedTest(5)
     public void repeatedDenseMulOnSparseTest(){
-        double[][] matrixData = MatrixGenerator.generateArray(1000);
-        double[][] matrixData2 = MatrixGenerator.generateArray(matrixData[0].length, 500);
+        double[][] matrixData = MatrixGenerator.generateArray(1500);
+        double[][] matrixData2 = MatrixGenerator.generateArray(matrixData[0].length, 1500);
         DenseMatrix m1 = new DenseMatrix(matrixData);
         DenseMatrix m2 = new DenseMatrix(matrixData2);
-        DenseMatrix expected = ((DenseMatrix) m1.mul(m2));
+        DenseMatrix expected = ((DenseMatrix) m1.dmul(m2));
         SparseMatrix sparseMatrix2 = new SparseMatrix(matrixData2);
-        SparseMatrix actual = ((SparseMatrix) m1.mul(sparseMatrix2));
+        Matrix actual = m1.dmul(sparseMatrix2);
         Assertions.assertEquals(expected, actual);
     }
 
     @RepeatedTest(5)
-    public void repeatedSparse95PercentOfZerosTest(){
-        MatrixGenerator.generateSparse("src/test/java/edu/spbu/matrix/matrixFileReaderTestSet/generatedSparse1.txt", 1000, 1500, 95);
-        MatrixGenerator.generateSparse("src/test/java/edu/spbu/matrix/matrixFileReaderTestSet/generatedSparse2.txt", 1000, 1500, 95);
+    public void repeatedSparseConcretePercentOfZerosTest(){
+        MatrixGenerator.generateSparse("src/test/java/edu/spbu/matrix/matrixFileReaderTestSet/generatedSparse1.txt", 1000, 1000, 90);
+        MatrixGenerator.generateSparse("src/test/java/edu/spbu/matrix/matrixFileReaderTestSet/generatedSparse2.txt", 1000, 1000, 90);
         DenseMatrix m1 = new DenseMatrix("src/test/java/edu/spbu/matrix/matrixFileReaderTestSet/generatedSparse1.txt");
         DenseMatrix m2 = new DenseMatrix("src/test/java/edu/spbu/matrix/matrixFileReaderTestSet/generatedSparse2.txt");
-        DenseMatrix expected = ((DenseMatrix) m1.mul(m2));
+        long start = System.currentTimeMillis();
+        Matrix expected = m1.dmul(m2);
+        System.out.println("dense time: " +(System.currentTimeMillis() - start));
         SparseMatrix sparseMatrix1 = new SparseMatrix("src/test/java/edu/spbu/matrix/matrixFileReaderTestSet/generatedSparse1.txt");
         SparseMatrix sparseMatrix2 = new SparseMatrix("src/test/java/edu/spbu/matrix/matrixFileReaderTestSet/generatedSparse2.txt");
-        SparseMatrix actual = ((SparseMatrix) sparseMatrix1.mul(sparseMatrix2));
+        start = System.currentTimeMillis();
+        Matrix actual = sparseMatrix1.dmul(sparseMatrix2);
+        System.out.println("sparse time: " +(System.currentTimeMillis() - start));
         Assertions.assertEquals(expected, actual);
     }
 }
