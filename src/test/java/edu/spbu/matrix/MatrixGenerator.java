@@ -6,7 +6,6 @@ import java.io.IOException;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class MatrixGenerator {
-    //никак иначе нельзя было(
     static double[][] generateArray(int bound){
 //        int m = ThreadLocalRandom.current().nextInt(1, bound);
 //        int n = ThreadLocalRandom.current().nextInt(1, bound);
