@@ -14,6 +14,7 @@ public class MyClient {
         client.sendGetRequest("lsaft/test.html", 8080);
         client.sendGetRequest("localhost", 8080);
         client.sendGetRequest("localhost/smth.html", 8080);
+        client.sendGetRequest("ru.wikipedia.org/wiki/Заглавная_страница", 80);
 
 
     }
